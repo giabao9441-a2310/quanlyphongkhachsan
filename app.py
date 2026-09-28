@@ -567,20 +567,68 @@ def dashboard():
     # REVENUE
     # --------------------------------------------------------
 
-    revenue = query_df(
-        """
-        SELECT
-            COALESCE(
-                SUM(amount),
-                0
-            ) AS total
-        FROM payments
-        """
-    )
+    # --------------------------------------------------------
+# REVENUE
+# --------------------------------------------------------
 
-    total_revenue = float(
-        revenue.iloc[0]["total"]
-    )
+# Tổng doanh thu từ tất cả booking
+revenue_df = query_df(
+    """
+    SELECT
+        COALESCE(
+            SUM(total_amount),
+            0
+        ) AS total
+    FROM bookings
+    WHERE status != 'Đã hủy'
+    """
+)
+
+total_revenue = float(
+    revenue_df.iloc[0]["total"]
+)
+
+# Tổng tiền đã thu
+paid_df = query_df(
+    """
+    SELECT
+        COALESCE(
+            SUM(amount),
+            0
+        ) AS total
+    FROM payments
+    """
+)
+
+total_paid = float(
+    paid_df.iloc[0]["total"]
+)
+
+# Công nợ
+total_debt = max(
+    total_revenue - total_paid,
+    0
+)
+
+# Doanh thu hôm nay
+today_revenue_df = query_df(
+    """
+    SELECT
+        COALESCE(
+            SUM(b.total_amount),
+            0
+        ) AS total
+    FROM bookings b
+    WHERE DATE(b.created_at)
+        = DATE('now', 'localtime')
+    AND b.status != 'Đã hủy'
+    """
+)
+
+today_revenue = float(
+    today_revenue_df.iloc[0]["total"]
+)
+
 
     today_revenue_df = query_df(
         """
