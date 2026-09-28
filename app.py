@@ -43,71 +43,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. XỬ LÝ CƠ SỞ DỮ LIỆU
+# 2. XỬ LÝ CƠ SỞ DỮ LIỆU & TỰ ĐỘNG NÂNG CẤP 100 PHÒNG
 # ==========================================
 DB_FILE = "hotel_management.db"
 
 def get_connection():
     return sqlite3.connect(DB_FILE, check_same_thread=False)
 
-def init_db():
-    conn = get_connection()
-    c = conn.cursor()
-    
-    # Bảng phòng
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS rooms (
-            room_number TEXT PRIMARY KEY,
-            room_type TEXT NOT NULL,
-            price REAL NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Trống'
-        )
-    ''')
-    
-    # Bảng lưu lịch sử đặt phòng & hóa đơn
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS bookings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            room_number TEXT NOT NULL,
-            customer_name TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            check_in DATE NOT NULL,
-            check_out DATE NOT NULL,
-            total_price REAL NOT NULL,
-            service_fee REAL DEFAULT 0,
-            booking_status TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Bảng dịch vụ (Minibar, giặt ủi...)
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS services (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            booking_id INTEGER NOT NULL,
-            service_name TEXT NOT NULL,
-            amount REAL NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (booking_id) REFERENCES bookings (id)
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# Hàm ép tạo mới/reset đủ 100 phòng
 def seed_100_rooms():
+    """Hàm tạo mới hoặc đè lại đủ 100 phòng vào CSDL"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("DELETE FROM rooms")
     
     rooms_data = []
-    # Tạo 5 tầng, mỗi tầng 20 phòng (Tổng = 100 phòng)
+    # Tạo 5 tầng, mỗi tầng 20 phòng (Tổng = 100 phòng: 101 -> 520)
     for floor in range(1, 6):
         for r in range(1, 21):
-            room_num = f"{floor}{r:02d}"  # VD: 101, 102... 520
+            room_num = f"{floor}{r:02d}"
             
             if floor in [1, 2]:
                 room_type = "Đơn (Standard)"
@@ -131,7 +84,7 @@ def seed_100_rooms():
             
     c.executemany("INSERT INTO rooms VALUES (?, ?, ?, ?)", rooms_data)
     
-    # Tạo booking mẫu cho các phòng đang ở
+    # Làm sạch và tạo booking mẫu
     c.execute("DELETE FROM bookings")
     c.execute('''
         INSERT INTO bookings (room_number, customer_name, phone, check_in, check_out, total_price, service_fee, booking_status)
@@ -140,6 +93,59 @@ def seed_100_rooms():
     
     conn.commit()
     conn.close()
+
+def init_db():
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # Tạo bảng phòng
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS rooms (
+            room_number TEXT PRIMARY KEY,
+            room_type TEXT NOT NULL,
+            price REAL NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Trống'
+        )
+    ''')
+    
+    # Tạo bảng lịch sử đặt phòng & hóa đơn
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS bookings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_number TEXT NOT NULL,
+            customer_name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            check_in DATE NOT NULL,
+            check_out DATE NOT NULL,
+            total_price REAL NOT NULL,
+            service_fee REAL DEFAULT 0,
+            booking_status TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Tạo bảng dịch vụ (Minibar, giặt ủi...)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS services (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            booking_id INTEGER NOT NULL,
+            service_name TEXT NOT NULL,
+            amount REAL NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (booking_id) REFERENCES bookings (id)
+        )
+    ''')
+    conn.commit()
+    
+    # TỰ ĐỘNG NÂNG CẤP: Nếu số phòng chưa đủ 100 phòng, tự động kích hoạt tạo 100 phòng
+    c.execute("SELECT COUNT(*) FROM rooms")
+    room_count = c.fetchone()[0]
+    conn.close()
+    
+    if room_count < 100:
+        seed_100_rooms()
+
+init_db()
 
 # ==========================================
 # 3. HÀM TRUY VẤN
@@ -207,10 +213,10 @@ menu = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 
-# NÚT KHÔI PHỤC ĐỦ 100 PHÒNG
-if st.sidebar.button("🔄 Khởi tạo lại đủ 100 phòng"):
+# NÚT ÉP TẠO 100 PHÒNG TRÊN GIAO DIỆN
+if st.sidebar.button("🔄 Ép tạo lại đủ 100 phòng", type="primary"):
     seed_100_rooms()
-    st.sidebar.success("Đã khởi tạo lại danh sách 100 phòng thành công!")
+    st.sidebar.success("Đã cài đặt lại đủ 100 phòng!")
     st.rerun()
 
 # ------------------------------------------
@@ -375,7 +381,6 @@ elif menu == "🔑 Nhận & Trả phòng":
                 b_data = booking_info.iloc[0]
                 b_id = b_data['id']
                 
-                # Chi tiết dịch vụ đã dùng
                 services_df = pd.read_sql("SELECT service_name, amount, created_at FROM services WHERE booking_id = ?", conn, params=(b_id,))
                 conn.close()
                 
@@ -431,7 +436,6 @@ elif menu == "🍹 Gọi Dịch vụ / Minibar":
                 cust_name = b_info.iloc[0]['customer_name']
                 st.info(f"Đang gọi dịch vụ cho khách: **{cust_name}** (Phòng {target_room})")
                 
-                # Danh mục dịch vụ có sẵn
                 service_catalog = {
                     "Nước suối Minibar": 15000,
                     "Coca / Pepsi Minibar": 20000,
@@ -580,7 +584,6 @@ elif menu == "📊 Báo cáo doanh thu":
             use_container_width=True
         )
         
-        # Nút xuất file CSV báo cáo
         csv_data = df_bookings.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📥 Tải Báo Cáo Giao Dịch (File CSV/Excel)",
