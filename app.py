@@ -8,7 +8,7 @@ from datetime import datetime, date
 # 1. CẤU HÌNH TRANG VÀ CSS (GIAO DIỆN CHUYÊN NGHIỆP)
 # ==========================================
 st.set_page_config(
-    page_title="Hệ Thống Quản Lý Khách Sạn - HMS Pro",
+    page_title="Hệ Thống Quản Lý Khách Sạn - 100 Phòng",
     page_icon="🏨",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -26,15 +26,15 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
     }
     .room-card {
-        padding: 18px;
-        border-radius: 12px;
+        padding: 12px;
+        border-radius: 10px;
         color: white;
         text-align: center;
         margin-bottom: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 3px 5px rgba(0,0,0,0.08);
     }
-    .room-card h3 { margin: 0 0 8px 0; color: white; font-size: 22px; }
-    .room-card p { margin: 3px 0; font-size: 14px; }
+    .room-card h3 { margin: 0 0 5px 0; color: white; font-size: 20px; }
+    .room-card p { margin: 2px 0; font-size: 13px; }
     .status-trong { background: linear-gradient(135deg, #28a745, #20c997); }
     .status-dang-o { background: linear-gradient(135deg, #dc3545, #f8d7da); color: #721c24 !important; }
     .status-dang-o h3 { color: #721c24 !important; }
@@ -45,7 +45,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. XỬ LÝ CƠ SỞ DỮ LIỆU (SQLITE)
+# 2. XỬ LÝ CƠ SỞ DỮ LIỆU & TẠO 100 PHÒNG
 # ==========================================
 DB_FILE = "hotel_management.db"
 
@@ -82,20 +82,40 @@ def init_db():
         )
     ''')
     
-    # Khởi tạo dữ liệu mẫu nếu chưa có phòng nào
+    # TỰ ĐỘNG TẠO 100 PHÒNG (NẾU DỮ LIỆU TRỐNG)
     c.execute("SELECT COUNT(*) FROM rooms")
     if c.fetchone()[0] == 0:
-        sample_rooms = [
-            ('101', 'Đơn (Standard)', 500000, 'Trống'),
-            ('102', 'Đơn (Standard)', 500000, 'Đang ở'),
-            ('201', 'Đôi (VIP)', 800000, 'Trống'),
-            ('202', 'Đôi (VIP)', 800000, 'Đặt trước'),
-            ('301', 'Gia đình (Suite)', 1200000, 'Bảo trì'),
-            ('302', 'Gia đình (Suite)', 1200000, 'Trống')
-        ]
-        c.executemany("INSERT INTO rooms VALUES (?, ?, ?, ?)", sample_rooms)
+        rooms_data = []
+        # Tạo 5 tầng, mỗi tầng 20 phòng (Tổng = 100 phòng)
+        for floor in range(1, 6):
+            for r in range(1, 21):
+                room_num = f"{floor}{r:02d}"  # VD: 101, 102... 520
+                
+                # Phân loại phòng và giá theo tầng
+                if floor in [1, 2]:
+                    room_type = "Đơn (Standard)"
+                    price = 500000
+                elif floor in [3, 4]:
+                    room_type = "Đôi (VIP)"
+                    price = 800000
+                else:
+                    room_type = "Gia đình (Suite)"
+                    price = 1500000
+                
+                # Tạo một số phòng có trạng thái mẫu ngẫu nhiên
+                status = "Trống"
+                if r in [2, 5]:
+                    status = "Đang ở"
+                elif r == 8:
+                    status = "Đặt trước"
+                elif r == 12:
+                    status = "Bảo trì"
+                    
+                rooms_data.append((room_num, room_type, price, status))
+                
+        c.executemany("INSERT INTO rooms VALUES (?, ?, ?, ?)", rooms_data)
         
-        # Booking mẫu cho phòng 102
+        # Booking mẫu cho các phòng đang ở
         c.execute('''
             INSERT INTO bookings (room_number, customer_name, phone, check_in, check_out, total_price, booking_status)
             VALUES ('102', 'Nguyễn Văn A', '0901234567', ?, ?, 500000, 'Đã nhận phòng')
@@ -111,7 +131,7 @@ init_db()
 # ==========================================
 def load_rooms():
     conn = get_connection()
-    df = pd.read_sql("SELECT * FROM rooms ORDER BY room_number ASC", conn)
+    df = pd.read_sql("SELECT * FROM rooms ORDER BY CAST(room_number AS INTEGER) ASC", conn)
     conn.close()
     return df
 
@@ -151,7 +171,7 @@ def delete_room(room_number):
 # ==========================================
 # 4. THANH ĐIỀU HƯỚNG (SIDEBAR)
 # ==========================================
-st.sidebar.title("🏨 HMS NAVIGATOR")
+st.sidebar.title("🏨 HMS - 100 PHÒNG")
 st.sidebar.markdown("---")
 
 menu = st.sidebar.radio(
@@ -160,13 +180,13 @@ menu = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Mẹo:** Dùng trang **Sơ đồ phòng** để theo dõi nhanh trạng thái khách sạn thời gian thực.")
+st.sidebar.info("💡 **Hệ thống hỗ trợ quản lý 100 phòng** phân bố trên 5 tầng.")
 
 # ------------------------------------------
 # CHỨC NĂNG 1: SƠ ĐỒ PHÒNG LIVE
 # ------------------------------------------
 if menu == "📌 Sơ đồ phòng Live":
-    st.title("📌 Sơ Đồ Phòng Theo Thời Gian Thực")
+    st.title("📌 Sơ Đồ 100 Phòng Theo Thời Gian Thực")
     
     df_rooms = load_rooms()
     
@@ -186,20 +206,32 @@ if menu == "📌 Sơ đồ phòng Live":
     
     st.markdown("---")
     
-    # Lọc trạng thái
-    filter_status = st.multiselect(
-        "Lọc hiển thị theo trạng thái:",
-        options=["Trống", "Đang ở", "Đặt trước", "Bảo trì"],
-        default=["Trống", "Đang ở", "Đặt trước", "Bảo trì"]
-    )
+    # Bộ lọc Tầng & Trạng thái phòng (Rất quan trọng khi quản lý 100 phòng)
+    col_f1, col_f2 = st.columns([1, 2])
     
-    filtered_rooms = df_rooms[df_rooms['status'].isin(filter_status)]
+    with col_f1:
+        # Lấy danh sách các tầng có sẵn (Dựa vào ký tự đầu tiên của phòng)
+        df_rooms['Floor'] = df_rooms['room_number'].apply(lambda x: f"Tầng {x[0]}")
+        selected_floors = st.multiselect(
+            "Lọc theo Tầng:",
+            options=sorted(df_rooms['Floor'].unique()),
+            default=sorted(df_rooms['Floor'].unique())
+        )
+        
+    with col_f2:
+        filter_status = st.multiselect(
+            "Lọc theo Trạng thái:",
+            options=["Trống", "Đang ở", "Đặt trước", "Bảo trì"],
+            default=["Trống", "Đang ở", "Đặt trước", "Bảo trì"]
+        )
+    
+    filtered_rooms = df_rooms[(df_rooms['status'].isin(filter_status)) & (df_rooms['Floor'].isin(selected_floors))]
     
     if filtered_rooms.empty:
         st.warning("Không tìm thấy phòng phù hợp với bộ lọc!")
     else:
-        # Render Grid 4 Cột
-        cols = st.columns(4)
+        # Render Grid 5 Cột để hiển thị đẹp mắt cho 100 phòng
+        cols = st.columns(5)
         status_class = {
             "Trống": "status-trong",
             "Đang ở": "status-dang-o",
@@ -208,16 +240,16 @@ if menu == "📌 Sơ đồ phòng Live":
         }
         
         for idx, row in filtered_rooms.reset_index(drop=True).iterrows():
-            col_idx = idx % 4
+            col_idx = idx % 5
             css_cls = status_class.get(row['status'], "")
             with cols[col_idx]:
                 st.markdown(
                     f"""
                     <div class="room-card {css_cls}">
-                        <h3>Phòng {row['room_number']}</h3>
-                        <p><b>Loại:</b> {row['room_type']}</p>
-                        <p><b>Trạng thái:</b> {row['status']}</p>
-                        <p><b>Giá:</b> {row['price']:,.0f} VNĐ/đêm</p>
+                        <h3>P. {row['room_number']}</h3>
+                        <p><b>{row['room_type']}</b></p>
+                        <p><b>{row['status']}</b></p>
+                        <p>{row['price']:,.0f} đ/đêm</p>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -238,13 +270,13 @@ elif menu == "🔑 Nhận & Trả phòng":
         available_rooms = df_rooms[df_rooms['status'] == 'Trống']
         
         if available_rooms.empty:
-            st.error("Rất tiếc! Hiện tại khách sạn không còn phòng trống.")
+            st.error("Rất tiếc! Hiện tại tất cả các phòng đã kín khách.")
         else:
             with st.form("form_checkin"):
                 col_a, col_b = st.columns(2)
                 
                 with col_a:
-                    selected_room = st.selectbox("Chọn số phòng", available_rooms['room_number'].tolist())
+                    selected_room = st.selectbox("Chọn phòng trống", available_rooms['room_number'].tolist())
                     customer_name = st.text_input("Họ và tên khách hàng (*)")
                     phone = st.text_input("Số điện thoại / CCCD (*)")
                 
@@ -312,7 +344,7 @@ elif menu == "🔑 Nhận & Trả phòng":
 # CHỨC NĂNG 3: QUẢN LÝ DANH MỤC PHÒNG
 # ------------------------------------------
 elif menu == "⚙️ Quản lý danh mục phòng":
-    st.title("⚙️ Cấu Hình & Quản Lý Phòng")
+    st.title("⚙️ Cấu Hình & Quản Lý Danh Mục 100 Phòng")
     
     df_rooms = load_rooms()
     
@@ -323,22 +355,22 @@ elif menu == "⚙️ Quản lý danh mục phòng":
         st.dataframe(
             df_rooms.style.format({"price": "{:,.0f} VNĐ"}),
             use_container_width=True,
-            height=300
+            height=400
         )
         
     with col_add:
         st.subheader("➕ Thêm phòng mới")
         with st.form("form_add_room"):
-            new_no = st.text_input("Số phòng (VD: 104)")
+            new_no = st.text_input("Số phòng (VD: 601)")
             new_type = st.selectbox("Loại phòng", ["Đơn (Standard)", "Đôi (VIP)", "Gia đình (Suite)"])
             new_price = st.number_input("Giá phòng/đêm (VNĐ)", min_value=100000, value=500000, step=50000)
             
-            btn_add = st.form_submit_button("Thêm phòng vào sơ đồ")
+            btn_add = st.form_submit_button("Thêm phòng vào hệ thống")
             if btn_add:
                 if not new_no.strip():
                     st.error("Số phòng không được bỏ trống!")
                 elif new_no in df_rooms['room_number'].values:
-                    st.error("Số phòng này đã tồn tại trong hệ thống!")
+                    st.error("Số phòng này đã tồn tại!")
                 else:
                     conn = get_connection()
                     c = conn.cursor()
